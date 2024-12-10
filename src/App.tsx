@@ -1,39 +1,53 @@
-import { useEffect, useState } from "react";
-import type { Schema } from "../amplify/data/resource";
-import { generateClient } from "aws-amplify/data";
-
-const client = generateClient<Schema>();
+import React, { useState } from 'react';
+import axios from 'axios';
+import './App.css';
 
 function App() {
-  const [todos, setTodos] = useState<Array<Schema["Todo"]["type"]>>([]);
+  const [prompt, setPrompt] = useState('');
+  const [image, setImage] = useState('');
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    client.models.Todo.observeQuery().subscribe({
-      next: (data) => setTodos([...data.items]),
-    });
-  }, []);
-
-  function createTodo() {
-    client.models.Todo.create({ content: window.prompt("Todo content") });
-  }
+  const handleGenerateImage = async () => {
+    if (!prompt) return alert('Please enter a prompt');
+    setLoading(true);
+    try {
+      const response = await axios.post(
+        'http://k8s-stabledi-stabledi-60974d5595-1390935052.ap-southeast-2.elb.amazonaws.com/imagine',
+        { prompt },
+        { responseType: 'arraybuffer' } // Expect binary data
+      );
+      // Convert binary data to base64
+      const base64Image = `data:image/png;base64,${Buffer.from(response.data, 'binary').toString('base64')}`;
+      setImage(base64Image);
+    } catch (error) {
+      console.error('Error details:', error.response || error.message);
+      alert('Failed to generate image. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
-    <main>
-      <h1>My todos</h1>
-      <button onClick={createTodo}>+ new</button>
-      <ul>
-        {todos.map((todo) => (
-          <li key={todo.id}>{todo.content}</li>
-        ))}
-      </ul>
-      <div>
-        🥳 App successfully hosted. Try creating a new todo.
-        <br />
-        <a href="https://docs.amplify.aws/react/start/quickstart/#make-frontend-updates">
-          Review next step of this tutorial.
-        </a>
-      </div>
-    </main>
+    <div className="App">
+      <header className="App-header">
+        <h1>Stable Diffusion App</h1>
+        <input
+          type="text"
+          placeholder="Enter your prompt"
+          value={prompt}
+          onChange={(e) => setPrompt(e.target.value)}
+        />
+        <button onClick={handleGenerateImage} disabled={loading}>
+          {loading ? 'Generating...' : 'Generate Image'}
+        </button>
+        {image && (
+          <div>
+            <h2>Generated Image</h2>
+            <img src={image} alt="Generated" />
+          </div>
+        )}
+      </header>
+    </div>
   );
 }
 
